@@ -64,7 +64,7 @@ class BetterPlayerDashUtils {
   static BetterPlayerAsmsAudioTrack parseAudio(XmlElement node, int index) {
     final String segmentAlignmentStr =
         node.getAttribute('segmentAlignment') ?? '';
-    String? label = node.getAttribute('label');
+    String? label = node.findAllElements('Label').first.text;
     final String? language = node.getAttribute('lang');
     final String? mimeType = node.getAttribute('mimeType');
 
