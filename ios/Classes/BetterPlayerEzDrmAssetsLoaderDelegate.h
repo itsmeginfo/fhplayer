@@ -10,6 +10,7 @@
 
 @property(readonly, nonatomic) NSURL* certificateURL;
 @property(readonly, nonatomic) NSURL* licenseURL;
-- (instancetype)init:(NSURL *)certificateURL withLicenseURL:(NSURL *)licenseURL;
+@property(readonly, nonatomic) NSString* bearerToken;
+- (instancetype)init:(NSURL *)certificateURL withLicenseURL:(NSURL *)licenseURL bearerToken:(NSString *)bearerToken;
 
 @end
