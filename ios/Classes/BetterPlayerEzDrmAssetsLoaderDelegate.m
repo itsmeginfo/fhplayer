@@ -11,13 +11,24 @@ NSData *_license;
 
 NSString * DEFAULT_LICENSE_SERVER_URL = @"https://fps.ezdrm.com/api/licenses/";
 
-- (instancetype)init:(NSURL *)certificateURL withLicenseURL:(NSURL *)licenseURL{
-    self = [super init];
-    _certificateURL = certificateURL;
-    _licenseURL = licenseURL;
+- (instancetype)init:(NSURL *)certificateURL withLicenseURL:(NSURL *)licenseURL bearerToken:(NSString *)bearerToken {
+    if (self = [super init]) {
+        _certificateURL = certificateURL;
+        _licenseURL = licenseURL;
+        // Ellenőrizzük, hogy a bearerToken nem nil és nem üres string
+        if (bearerToken && ![bearerToken isEqualToString:@""]) {
+            // Az érték érvényes, használhatjuk
+            _bearerToken = bearerToken;
+        } else {
+            // Ha nil vagy üres, kezeljük ezt az esetet (pl. adjunk neki alapértelmezett értéket)
+            _bearerToken = @"defaultBearerToken";
+            NSLog(@"Az érték nil vagy üres string, alapértelmezett érték használva");
+        }
+
+        // További inicializációk...
+    }
     return self;
 }
-
 /*------------------------------------------
  **
  ** getContentKeyAndLeaseExpiryFromKeyServerModuleWithRequest
@@ -32,7 +43,6 @@ typedef void (^DataCompletionBlock)(NSData *data, NSError *error);
                                                             and:(NSString *)contentId
                                                        completion:(DataCompletionBlock)completionHandler {
     NSURL *finalLicenseURL;
-    NSString *bearerToken = @"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYXBwdGVzdGVyQGZocGxheS5jb20iLCJlbWFpbCI6ImFwcHRlc3RlckBmaHBsYXkuY29tIiwianRpIjoiNTI3YjYxNmYtMmQzMC00NTgwLTlmOWItMmQyMDJhMjJmY2VhIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiJjMGIwNjQwZC03NzczLTRmMjEtYjk1ZC05ZWM2OTI4ZWQzOWUiLCJzdWIiOiJjMGIwNjQwZC03NzczLTRmMjEtYjk1ZC05ZWM2OTI4ZWQzOWUiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJVc2VyIiwiZXhwIjoxNjk4MjQ4MDA1LCJpc3MiOiJJc3N1ZXIiLCJhdWQiOiJBdWRpZW5jZSJ9.RuhNE7MxoBvSy2YpgKPkN4UO_p6acm8uvYwHn_W4ltI";
     // Check for _licenseURL, set finalLicenseURL accordingly
     if (_licenseURL != [NSNull null]) {
         finalLicenseURL = _licenseURL;
@@ -44,8 +54,10 @@ typedef void (^DataCompletionBlock)(NSData *data, NSError *error);
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:ksmURL];
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-type"];
-    NSString *authorizationHeader = [NSString stringWithFormat:@"Bearer %@", bearerToken];
-    [request setValue:authorizationHeader forHTTPHeaderField:@"Authorization"];
+    if ([_bearerToken length] != 0) {
+        NSString *authorizationHeader = [NSString stringWithFormat:@"Bearer %@", _bearerToken];
+        [request setValue:authorizationHeader forHTTPHeaderField:@"Authorization"];
+    }
 
     NSString *stringBody = [NSString stringWithFormat:@"spc=%@&assetId=%@", [requestBytes base64EncodedStringWithOptions:0], contentId];
     NSData *body = [stringBody dataUsingEncoding:NSUTF8StringEncoding];
