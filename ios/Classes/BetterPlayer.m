@@ -210,36 +210,37 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
             videoExtension = nil;
         }
         
-        item = [cacheManager getCachingPlayerItemForNormalPlayback:url cacheKey:cacheKey videoExtension: videoExtension headers:headers];
+        item = [cacheManager getCachingPlayerItemForNormalPlayback:url cacheKey:cacheKey videoExtension: videoExtension headers:headers certificateUrl: certificateUrl licenseUrl: licenseUrl];
     } else {
+
         AVURLAsset* asset = [AVURLAsset URLAssetWithURL:url
-                                                options:@{@"AVURLAssetHTTPHeaderFieldsKey" : headers}];
-        if (certificateUrl && certificateUrl != [NSNull null] && [certificateUrl length] > 0) {
+                                                        options:@{@"AVURLAssetHTTPHeaderFieldsKey" : headers}];
+                if (certificateUrl && certificateUrl != [NSNull null] && [certificateUrl length] > 0) {
 
-            NSString *authValue = [headers objectForKey:@"Authorization"];
-            NSArray *components = [authValue componentsSeparatedByString:@" "];
-            NSString *bearerToken = @"";
+                    NSString *authValue = [headers objectForKey:@"Authorization"];
+                    NSArray *components = [authValue componentsSeparatedByString:@" "];
+                    NSString *bearerToken = @"";
 
-            if (components.count >= 2) {
-                bearerToken = [components objectAtIndex:1];
-            }
+                    if (components.count >= 2) {
+                        bearerToken = [components objectAtIndex:1];
+                    }
 
-            NSURL *certificateNSURL = [NSURL URLWithString:certificateUrl];
-            NSURL *licenseNSURL = nil;
-            if (licenseUrl && ![licenseUrl isKindOfClass:[NSNull class]]) {
-                licenseNSURL = [NSURL URLWithString:licenseUrl];
-            } else {
-                // Kezeljük az NSNull vagy nil értéket, például adjunk neki alapértelmezett értéket
-                NSLog(@"A licenseUrl nil vagy NSNull, alapértelmezett érték használva");
-                // Adj hozzá alapértelmezett URL-t vagy kezelje a helyzetet más módon
-            }
+                    NSURL *certificateNSURL = [NSURL URLWithString:certificateUrl];
+                    NSURL *licenseNSURL = nil;
+                    if (licenseUrl && ![licenseUrl isKindOfClass:[NSNull class]]) {
+                        licenseNSURL = [NSURL URLWithString:licenseUrl];
+                    } else {
+                        // Kezeljük az NSNull vagy nil értéket, például adjunk neki alapértelmezett értéket
+                        NSLog(@"A licenseUrl nil vagy NSNull, alapértelmezett érték használva");
+                        // Adj hozzá alapértelmezett URL-t vagy kezelje a helyzetet más módon
+                    }
 
-            _loaderDelegate = [[BetterPlayerEzDrmAssetsLoaderDelegate alloc] init:certificateNSURL withLicenseURL:licenseNSURL bearerToken:bearerToken];
-            dispatch_queue_attr_t qos = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_DEFAULT, -1);
-            dispatch_queue_t streamQueue = dispatch_queue_create("streamQueue", qos);
-            [asset.resourceLoader setDelegate:_loaderDelegate queue:streamQueue];
-        }
-        item = [AVPlayerItem playerItemWithAsset:asset];
+                    _loaderDelegate = [[BetterPlayerEzDrmAssetsLoaderDelegate alloc] init:certificateNSURL withLicenseURL:licenseNSURL bearerToken:bearerToken];
+                    dispatch_queue_attr_t qos = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_DEFAULT, -1);
+                    dispatch_queue_t streamQueue = dispatch_queue_create("streamQueue", qos);
+                    [asset.resourceLoader setDelegate:_loaderDelegate queue:streamQueue];
+                }
+                item = [AVPlayerItem playerItemWithAsset:asset];
     }
 
     if (@available(iOS 10.0, *) && overriddenDuration > 0) {
