@@ -364,7 +364,8 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         if (_player.rate == 0 && //if player rate dropped to 0
             CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, >, kCMTimeZero) && //if video was started
             CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, <, _player.currentItem.duration) && //but not yet finished
-            _isPlaying) { //instance variable to handle overall state (changed to YES when user triggers playback)
+            _isPlaying &&
+            !_isSeeking) { //instance variable to handle overall state (changed to YES when user triggers playback)
             [self handleStalled];
         }
     }
@@ -503,6 +504,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (void)play {
+    if (_isPlaying) {
+        return;
+    }
     _stalledCount = 0;
     _isStalledCheckStarted = false;
     _isPlaying = true;

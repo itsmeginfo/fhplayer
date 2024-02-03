@@ -17,7 +17,6 @@ A new flutter plugin project.
   s.dependency 'Flutter'
   s.dependency 'Cache', '~> 6.0.0'
   s.dependency 'GCDWebServer'
-  s.dependency 'HLSCachingReverseProxyServer'
   s.dependency 'PINCache'
   
   s.platform = :ios, '11.0'
