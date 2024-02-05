@@ -1,12 +1,11 @@
 import AVKit
 import Cache
-import HLSCachingReverseProxyServer
 import GCDWebServer
 import PINCache
 import AVFoundation
 
-@objc public class CacheManager: NSObject, AVAssetResourceLoaderDelegate {
-
+@objc public class CacheManager: NSObject {
+    
     // We store the last pre-cached CachingPlayerItem objects to be able to play even if the download
     // has not finished.
     var _preCachedURLs = Dictionary<String, CachingPlayerItem>()
@@ -30,7 +29,9 @@ import AVFoundation
     )
     
     var server: HLSCachingReverseProxyServer?
-
+    
+    private var loaderDelegate: BetterPlayerEzDrmAssetsLoaderDelegate?
+    
     lazy var storage: Cache.Storage<String,Data>? = {
         return try? Cache.Storage<String,Data>(diskConfig: diskConfig, memoryConfig: memoryConfig, transformer: TransformerFactory.forCodable(ofType: Data.self))
     }()
@@ -90,62 +91,53 @@ import AVFoundation
     ///Gets caching player item for normal playback.
     @objc public func getCachingPlayerItemForNormalPlayback(_ url: URL, cacheKey: String?, videoExtension: String?, headers: [NSObject:AnyObject], certificateUrl: String?, licenseUrl: String?) -> AVPlayerItem? {
         let mimeTypeResult = getMimeType(url: url, explicitVideoExtension: videoExtension)
-
-            if mimeTypeResult.1 != "application/vnd.apple.mpegurl" {
-                // Reverse proxy URL létrehozása
-                if let reverseProxyURL = server?.reverseProxyURL(from: url) {
-                    // AVURLAsset létrehozása
-                    var bearerToken = ""
+        
+        if mimeTypeResult.1 == "application/vnd.apple.mpegurl" {
+            // Reverse proxy URL létrehozása
+            if let reverseProxyURL = server?.reverseProxyURL(from: url) {
+                // AVURLAsset létrehozása
+                let asset = AVURLAsset(url: reverseProxyURL)
+                // DRM-kezelés hozzáadása a Swift kódban, ha szükséges
+                if let certificateUrl = certificateUrl, !certificateUrl.isEmpty {
                     if let authValue = headers["Authorization" as NSObject] {
                         let components = authValue.components(separatedBy: " ")
-                        
+                        var bearerToken = ""
                         
                         if components.count >= 2 {
                             bearerToken = components[1]
                         }
-                    }
-                     let asset = AVURLAsset(url: reverseProxyURL)
-                    // DRM-kezelés hozzáadása a Swift kódban, ha szükséges
-                    if let certificateUrl = certificateUrl, !certificateUrl.isEmpty {
-                        if let authValue = headers["Authorization" as NSObject] {
-                            let components = authValue.components(separatedBy: " ")
-                            var bearerToken = ""
-
-                            if components.count >= 2 {
-                                bearerToken = components[1]
-                            }
-
-                            guard let certificateNSURL = URL(string: certificateUrl) else {
-                                // Kezelés, ha a URL nem érvényes
-                                return nil
-                            }
-
-                            var licenseNSURL: URL?
-
-                            if let licenseUrl = licenseUrl, !licenseUrl.isEmpty {
-                                licenseNSURL = URL(string: licenseUrl)
-                            } else {
-                                // Kezeljük az NSNull vagy nil értéket, például adjunk neki alapértelmezett értéket
-                                print("A licenseUrl nil vagy NSNull, alapértelmezett érték használva")
-                                // Adj hozzá alapértelmezett URL-t vagy kezelje a helyzetet más módon
-                            }
-
-                            let loaderDelegate = BetterPlayerEzDrmAssetsLoaderDelegate(certificateURL: certificateNSURL, licenseURL: licenseNSURL, bearerToken: bearerToken)
-
-                            // Asset resource loader delegate hozzárendelése
-                            asset.resourceLoader.setDelegate(loaderDelegate, queue: DispatchQueue(label: "streamQueue"))
+                        
+                        guard let certificateNSURL = URL(string: certificateUrl) else {
+                            // Kezelés, ha a URL nem érvényes
+                            return nil
                         }
+                        
+                        var licenseNSURL: URL?
+                        
+                        if let licenseUrl = licenseUrl, !licenseUrl.isEmpty {
+                            licenseNSURL = URL(string: licenseUrl)
+                        } else {
+                            // Kezeljük az NSNull vagy nil értéket, például adjunk neki alapértelmezett értéket
+                            print("A licenseUrl nil vagy NSNull, alapértelmezett érték használva")
+                            // Adj hozzá alapértelmezett URL-t vagy kezelje a helyzetet más módon
+                        }
+                        
+                        loaderDelegate = BetterPlayerEzDrmAssetsLoaderDelegate(certificateURL: certificateNSURL, licenseURL: licenseNSURL, bearerToken: bearerToken)
+                        
+                        // Asset resource loader delegate hozzárendelése
+                        asset.resourceLoader.setDelegate(loaderDelegate, queue: DispatchQueue(label: "streamQueue"))
                     }
-
-                    // AVPlayerItem létrehozása
-                    let playerItem = AVPlayerItem(asset: asset)
-                    return playerItem
                 }
-            } else {
-                // DRM-kezelés Swift kódban, ha nem a cache részágban van
-                return getCachingPlayerItem(url, cacheKey: cacheKey, videoExtension: videoExtension, headers: headers)
+                
+                // AVPlayerItem létrehozása
+                let playerItem = AVPlayerItem(asset: asset)
+                return playerItem
             }
-
+        } else {
+            // DRM-kezelés Swift kódban, ha nem a cache részágban van
+            return getCachingPlayerItem(url, cacheKey: cacheKey, videoExtension: videoExtension, headers: headers)
+        }
+        
         return nil
     }
 
@@ -196,6 +188,10 @@ import AVFoundation
     }
     
     private func getMimeType(url: URL, explicitVideoExtension: String?) -> (String, String) {
+        if url.pathComponents.last?.contains("m3u8") == true {
+            return ("m3u8", "application/vnd.apple.mpegurl")
+        }
+        
         var videoExtension = url.pathExtension
         if let explicitVideoExtension = explicitVideoExtension {
             videoExtension = explicitVideoExtension
@@ -328,8 +324,8 @@ class BetterPlayerEzDrmAssetsLoaderDelegate: NSObject, AVAssetResourceLoaderDele
 
         dataTask.resume()
     }
-
-    func getAppCertificate(_ string: String) -> Data? {
+    
+    func getAppCertificate(_ string: String) throws -> Data? {
         do {
             let certificate = try Data(contentsOf: certificateURL)
             license = certificate
